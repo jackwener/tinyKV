@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pingcap-incubator/tinykv/kv/coprocessor"
 	"github.com/pingcap-incubator/tinykv/kv/storage"
@@ -53,6 +54,7 @@ func (server *Server) RawGet(_ context.Context, req *kvrpcpb.RawGetRequest) (*kv
 	res := &kvrpcpb.RawGetResponse{
 		Value: val,
 	}
+	fmt.Println("val: ", val, " !!!!!!!!!!!!!!!!!!!! ")
 	if val == nil {
 		res.NotFound = true
 	}

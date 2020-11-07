@@ -8,59 +8,75 @@ import (
 	"github.com/pingcap-incubator/tinykv/proto/pkg/kvrpcpb"
 )
 
-// StandAloneStorage is an implementation of `Storage` for a single-node TinyKV instance. It does not
-// communicate with other nodes and all data is stored locally.
 type StandAloneStorage struct {
 	// Your Data Here (1).
-	KvStore *badger.DB
+	conf *config.Config
+	db   *badger.DB
 }
 
-type StandAloneStorageReader struct {
+type StandAloneReader struct {
 	txn *badger.Txn
 }
 
-func (reader *StandAloneStorageReader) Close() {
-	reader.txn.Discard()
-}
-
-func (reader *StandAloneStorageReader) GetCF(cf string, key []byte) ([]byte, error) {
-	val, err := engine_util.GetCFFromTxn(reader.txn, cf, key)
+func (s *StandAloneReader) GetCF(cf string, key []byte) ([]byte, error) {
+	val, err := engine_util.GetCFFromTxn(s.txn, cf, key)
 	if err == badger.ErrKeyNotFound {
 		return nil, nil
 	}
-	return val, err
+	return val, nil
 }
 
-func (reader *StandAloneStorageReader) IterCF(cf string) engine_util.DBIterator {
-	return engine_util.NewCFIterator(cf, reader.txn)
+func (s *StandAloneReader) IterCF(cf string) engine_util.DBIterator {
+	return engine_util.NewCFIterator(cf, s.txn)
+}
+
+func (s *StandAloneReader) Close() {
+	s.txn.Discard()
 }
 
 func NewStandAloneStorage(conf *config.Config) *StandAloneStorage {
 	// Your Code Here (1).
 	return &StandAloneStorage{
-		KvStore: engine_util.CreateDB("kv", conf.Raft),
+		conf: conf,
+		db:   nil,
 	}
 }
 
 func (s *StandAloneStorage) Start() error {
 	// Your Code Here (1).
+	s.db = engine_util.CreateDB(s.conf.DBPath, s.conf.Raft)
 	return nil
 }
 
 func (s *StandAloneStorage) Stop() error {
 	// Your Code Here (1).
-	return s.KvStore.Close()
+	return s.db.Close()
 }
 
 func (s *StandAloneStorage) Reader(ctx *kvrpcpb.Context) (storage.StorageReader, error) {
 	// Your Code Here (1).
-	txn := s.KvStore.NewTransaction(false)
-	return &StandAloneStorageReader{
-		txn,
+	return &StandAloneReader{
+		txn: s.db.NewTransaction(false),
 	}, nil
 }
 
 func (s *StandAloneStorage) Write(ctx *kvrpcpb.Context, batch []storage.Modify) error {
 	// Your Code Here (1).
+	for _, modify := range batch {
+		value := modify.Value()
+		cf := modify.Cf()
+		key := modify.Key()
+		if value == nil {
+			err := engine_util.DeleteCF(s.db, cf, key)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := engine_util.PutCF(s.db, cf, key, value)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }

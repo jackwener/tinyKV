@@ -45,6 +45,7 @@ func (server *Server) RawGet(_ context.Context, req *kvrpcpb.RawGetRequest) (*kv
 			Error: err.Error(),
 		}, err
 	}
+	defer reader.Close()
 	val, err := reader.GetCF(req.Cf, req.Key)
 	if err != nil {
 		return &kvrpcpb.RawGetResponse{

@@ -772,3 +772,15 @@ func (r *Raft) removeNode(id uint64) {
 	// Your Code Here (3A).
 }
 
+
+func (r *Raft) softState() *SoftState {
+	return &SoftState{Lead: r.Lead, RaftState: r.State}
+}
+
+func (r *Raft) hardState() pb.HardState {
+	return pb.HardState{
+		Term:   r.Term,
+		Vote:   r.Vote,
+		Commit: r.RaftLog.committed,
+	}
+}
